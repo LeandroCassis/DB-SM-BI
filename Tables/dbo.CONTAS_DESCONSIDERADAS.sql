@@ -1,0 +1,9 @@
+﻿CREATE TABLE [dbo].[CONTAS_DESCONSIDERADAS] (
+  [SERVIDOR] [varchar](50) NULL,
+  [COD EMPRESA] [int] NULL,
+  [COD CONTA CONTÁBIL] [int] NULL,
+  [CONTA CONTÁBIL] [varchar](100) NULL,
+  [CLASSIFICAÇÃO] [varchar](50) NULL
+)
+ON [PRIMARY]
+GO

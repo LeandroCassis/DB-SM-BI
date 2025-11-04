@@ -1,0 +1,54 @@
+﻿SET QUOTED_IDENTIFIER, ANSI_NULLS ON
+GO
+CREATE   VIEW [dbo].[INAT_VW_METAS_RAJAMINE] AS
+
+
+SELECT 
+
+_DADOS_PROGRAMADOS.[DATA],
+_DADOS_PROGRAMADOS.[ID EQUIPAMENTO RJM],
+METAS_RAJAMINE.[ID INDICADOR],
+METAS_RAJAMINE.INDICADOR,
+METAS_RAJAMINE.EMPRESA,
+_DADOS_PROGRAMADOS.[DIAS PROGRAMADOS MÊS],
+METAS_RAJAMINE.[META ÍNDICE]/_DADOS_PROGRAMADOS.[DIAS PROGRAMADOS MÊS] 'META ÍNDICE'
+
+
+FROM (
+SELECT 
+
+CAST(HorasProgramadas.DATA AS DATE) 'DATA',
+HorasProgramadasEquipamento.IdEquipamento 'ID EQUIPAMENTO RJM',
+MAX(_RESUMO.[DIAS PROGRAMADOS MÊS]) 'DIAS PROGRAMADOS MÊS'
+
+FROM RajaMine.dbo.HorasProgramadasEquipamento WITH (NOLOCK)
+LEFT JOIN RajaMine.dbo.HorasProgramadas  WITH (NOLOCK)
+ON HorasProgramadasEquipamento.IdHorasProgramadas = HorasProgramadas.Id
+LEFT JOIN (
+SELECT 
+CAST(DATEADD(month, DATEDIFF(month, 0, HorasProgramadas.DATA), 0) AS DATE) 'INÍCIO DO MÊS',
+HorasProgramadasEquipamento.IdEquipamento 'ID EQUIPAMENTO RJM',
+COUNT(DISTINCT HorasProgramadas.DATA) 'DIAS PROGRAMADOS MÊS'
+FROM RajaMine.dbo.HorasProgramadasEquipamento WITH (NOLOCK)
+LEFT JOIN RajaMine.dbo.HorasProgramadas  WITH (NOLOCK)
+ON HorasProgramadasEquipamento.IdHorasProgramadas = HorasProgramadas.Id
+
+WHERE YEAR(HorasProgramadas.DATA)  >= 2024
+
+GROUP BY 
+CAST(DATEADD(month, DATEDIFF(month, 0, HorasProgramadas.DATA), 0) AS DATE),
+HorasProgramadasEquipamento.IdEquipamento 
+
+) _RESUMO
+
+ON CAST(DATEADD(month, DATEDIFF(month, 0, HorasProgramadas.DATA), 0) AS DATE) = _RESUMO.[INÍCIO DO MÊS]
+AND HorasProgramadasEquipamento.IdEquipamento = _RESUMO.[ID EQUIPAMENTO RJM]
+WHERE YEAR(HorasProgramadas.DATA)  >= 2024
+GROUP BY CAST(HorasProgramadas.DATA AS DATE), HorasProgramadasEquipamento.IdEquipamento 
+
+) _DADOS_PROGRAMADOS
+
+INNER JOIN METAS_RAJAMINE WITH (NOLOCK)
+ON CAST(DATEADD(month, DATEDIFF(month, 0, _DADOS_PROGRAMADOS.DATA), 0) AS DATE) = METAS_RAJAMINE.[INÍCIO DO MÊS]
+AND _DADOS_PROGRAMADOS.[ID EQUIPAMENTO RJM] = METAS_RAJAMINE.[ID EQUIPAMENTO RJM]
+GO

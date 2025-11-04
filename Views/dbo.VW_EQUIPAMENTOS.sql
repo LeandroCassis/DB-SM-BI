@@ -1,0 +1,164 @@
+﻿SET QUOTED_IDENTIFIER, ANSI_NULLS ON
+GO
+CREATE VIEW [dbo].[VW_EQUIPAMENTOS] 
+AS SELECT
+CONCAT_WS('-',Equipamento.Id,UPPER(Equipamento.Descricao)) 'KEY EQUIPAMENTO'
+ ,Equipamento.Id AS 'ID EQUIPAMENTO RJM'
+ ,CONCAT_WS('-',EQUIPAMENTOS_ENGEMAN_X_RAJAMINE.SERVIDOR,EQUIPAMENTOS_ENGEMAN_X_RAJAMINE.[ID ENGEMAN])'KEY EQUIPAMENTO ENGEMAN'
+ ,UPPER(Equipamento.Descricao) AS 'EQUIPAMENTO'
+ ,Equipamento.IdTipoEquipamento AS 'ID TIPO'
+ ,UPPER(TipoEquipamento.Descricao) AS 'TIPO'
+ ,IIF(CHARINDEX('(EXTERNO)', TipoEquipamento.Descricao) > 0, 'SIM', 
+ IIF(CHARINDEX('(TERCEIRO)', TipoEquipamento.Descricao) > 0, 'SIM', 
+ 'NÃO')) 'EXTERNO'
+ ,IIF(CHARINDEX('(EXTERNO)', TipoEquipamento.Descricao) > 0, 'EQUIPAMENTOS DE TERCEIROS',
+ IIF(CHARINDEX('(TERCEIRO)', TipoEquipamento.Descricao) > 0, 'EQUIPAMENTOS DE TERCEIROS',
+ 'EQUIPAMENTOS PRÓPRIOS')) 'EXTERNO LEGENDA'
+ ,IIF(Equipamento.ControlaHorimetro='S','SIM','NÃO') AS 'CONTROLA HORÍMETRO'
+ ,IIF(Equipamento.ControlaKM='S','SIM','NÃO') AS 'CONTROLA KM'
+-- ,Equipamento.KM AS 'KILOMETRAGEM'
+-- ,Equipamento.Horimetro AS 'HORÍMETRO'
+ ,Equipamento.Status AS 'STATUS'
+ ,Equipamento.DataCadastro AS 'DATA CADASTRO'
+
+,IIF(CHARINDEX('INATIVO', Equipamento.Descricao) > 0, 'NÃO',
+IIF(Equipamento.Ativo='S','SIM','NÃO')) AS 'ATIVO'
+ ,Equipamento.IdEmpresa AS 'ID EMPRESA'
+ ,Empresa.Descricao 'EMPRESA'
+ ,Equipamento.Placa AS 'PLACA'
+ ,CASE
+WHEN Modulo='A'THEN 'TABLET E TELEMETRIA'
+WHEN Modulo='E'THEN 'TELEMETRIA'
+WHEN Modulo='N'THEN 'NADA'
+WHEN Modulo='R'THEN 'RASTREADOR' 
+WHEN Modulo='T'THEN 'TABLET' ELSE 'VERIFICAR' END 'MÓDULO',
+
+  CASE 
+WHEN CHARINDEX('CARREGADEIRA', TipoEquipamento.Descricao) > 0 THEN 'HORA'
+WHEN CHARINDEX('ESCAVADEIRA', TipoEquipamento.Descricao) > 0 THEN 'HORA'
+WHEN CHARINDEX('MUNCK', TipoEquipamento.Descricao) > 0 THEN 'HORA'
+WHEN CHARINDEX('NIVELADORA', TipoEquipamento.Descricao) > 0 THEN 'HORA'
+ELSE 'KILOMETRO' END AS 'UNIDADE CONTROLE',
+
+  CASE 
+WHEN CHARINDEX('CARREGADEIRA', TipoEquipamento.Descricao) > 0 THEN 'MÁQUINA'
+WHEN CHARINDEX('ESCAVADEIRA', TipoEquipamento.Descricao) > 0 THEN 'MÁQUINA'
+WHEN CHARINDEX('MUNCK', TipoEquipamento.Descricao) > 0 THEN 'MÁQUINA'
+WHEN CHARINDEX('NIVELADORA', TipoEquipamento.Descricao) > 0 THEN 'MÁQUINA'
+ELSE 'CAMINHÃO' END AS 'CATEGORIA EQUIPAMENTO',
+_LOCALICAÇÃO.[DATA LOCALICAÇÃO],
+_LOCALICAÇÃO.LATITUDE,
+_LOCALICAÇÃO.LONGITUDE,
+UPPER(Equipamento.MarcaModelo) 'MARCA/MODELO',
+UPPER(Equipamento.TipoRastreador) 'TIPO RASTREADOR'
+,
+_HORIMETRO.HORÍMETRO 'HORÍMETRO',
+_KM.KILOMETRAGEM 'KILOMETRAGEM',
+_ABASTECIMENTO.COMBUSTÍVEL 'COMBUSTÍVEL'
+
+,CASE 
+WHEN CHARINDEX('MUNCK',TipoEquipamento.Descricao) > 0 THEN 'NÃO'
+WHEN CHARINDEX('PIPA',TipoEquipamento.Descricao) > 0 THEN 'NÃO'
+WHEN CHARINDEX('MOTONIVELADORA', TipoEquipamento.Descricao) > 0 THEN 'NÃO'
+
+WHEN CHARINDEX('BROOKS',TipoEquipamento.Descricao) > 0 THEN 'SIM'
+WHEN CHARINDEX('CAMINHÃO',TipoEquipamento.Descricao) > 0 THEN 'SIM'
+WHEN CHARINDEX('ESCAVADEIRA', TipoEquipamento.Descricao) > 0 THEN 'SIM'
+WHEN CHARINDEX('CARREGADEIRA', TipoEquipamento.Descricao) > 0 THEN 'SIM'
+
+ELSE 'NÃO' END AS 'PRINCIPAIS'
+
+--,CASE 
+--WHEN CHARINDEX('MUNCK',TipoEquipamento.Descricao) > 0 THEN 'NÃO'
+--WHEN CHARINDEX('CAMINHÃO',TipoEquipamento.Descricao) > 0 THEN 'SIM'
+--WHEN CHARINDEX('MOTONIVELADORA', TipoEquipamento.Descricao) > 0 THEN 'SIM'
+--WHEN CHARINDEX('ESCAVADEIRA', TipoEquipamento.Descricao) > 0 THEN 'SIM'
+--WHEN CHARINDEX('CARREGADEIRA', TipoEquipamento.Descricao) > 0 THEN 'SIM'
+--ELSE 'NÃO' END AS 'CONTROLA'
+
+FROM RajaMine.dbo.Equipamento WITH (NOLOCK)
+LEFT JOIN RajaMine.dbo.Empresa WITH (NOLOCK)
+ON Equipamento.IdEmpresa = Empresa.Id 
+
+LEFT JOIN RajaMine.dbo.TipoEquipamento WITH (NOLOCK)
+ ON Equipamento.IdTipoEquipamento = TipoEquipamento.Id
+
+
+LEFT JOIN (
+SELECT
+IdEquipamento 'ID EQUIPAMENTO'
+,Data 'DATA LOCALICAÇÃO'
+,REPLACE(IIF(CoordX=0,NULL,CoordX),',','.') 'LATITUDE'
+,REPLACE(IIF(CoordY=0,NULL,CoordY),',','.') 'LONGITUDE'
+
+
+FROM (
+SELECT
+RANK () OVER (PARTITION BY  IdEquipamento ORDER BY (Data)  DESC) 'RANKING',
+ * 
+FROM RajaMine.dbo.Posicao  WITH (NOLOCK) ) _DADOS
+WHERE _DADOS.RANKING = 1 
+
+) _LOCALICAÇÃO 
+
+ON Equipamento.Id = _LOCALICAÇÃO.[ID EQUIPAMENTO]
+
+
+
+LEFT JOIN (
+SELECT
+[ID EQUIPAMENTO RJM] 'ID EQUIPAMENTO',
+SUM(#COMBUSTÍVEL) 'COMBUSTÍVEL'
+--SUM(#KILOMETRAGEM) 'KILOMETRAGEM'
+--SUM(#HORAS) 'HORÍMETRO'
+FROM BI.dbo.VW_TELEMETRIA
+WHERE ORIGEM = 'REAL'
+GROUP BY [ID EQUIPAMENTO RJM]  ) _ABASTECIMENTO
+
+
+ON Equipamento.Id = _ABASTECIMENTO.[ID EQUIPAMENTO]
+
+
+
+LEFT JOIN (
+SELECT DISTINCT * FROM (
+SELECT
+IdEquipamento 'ID EQUIPAMENTO'
+,HorimetroFim 'HORÍMETRO',
+RANK () OVER (PARTITION BY  IdEquipamento ORDER BY (DataIni)  DESC) 'RANKING'
+FROM RajaMine.dbo.HorimetroKM
+WHERE HorimetroFim >0
+
+
+) _HORIMETRO_1
+
+WHERE _HORIMETRO_1.RANKING =1
+
+) _HORIMETRO
+
+ON Equipamento.Id = _HORIMETRO.[ID EQUIPAMENTO]
+
+
+
+
+LEFT JOIN (
+SELECT DISTINCT * FROM (
+SELECT
+IdEquipamento 'ID EQUIPAMENTO'
+,KMFim 'KILOMETRAGEM',
+RANK () OVER (PARTITION BY  IdEquipamento ORDER BY (DataIni)  DESC) 'RANKING'
+FROM RajaMine.dbo.HorimetroKM
+WHERE KMFim>0
+
+) _KM_1
+
+WHERE _KM_1.RANKING =1 
+
+) _KM
+
+ON Equipamento.Id = _KM.[ID EQUIPAMENTO]
+
+
+LEFT JOIN EQUIPAMENTOS_ENGEMAN_X_RAJAMINE
+ON Equipamento.Id = EQUIPAMENTOS_ENGEMAN_X_RAJAMINE.[ID RAJAMINE]
+GO

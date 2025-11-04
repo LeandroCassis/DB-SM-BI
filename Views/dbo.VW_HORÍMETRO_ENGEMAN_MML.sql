@@ -1,0 +1,58 @@
+﻿SET QUOTED_IDENTIFIER, ANSI_NULLS ON
+GO
+
+CREATE VIEW [dbo].[VW_HORÍMETRO_ENGEMAN_MML] AS
+
+
+WITH BaseValores AS (
+    SELECT 
+        'MML' AS 'SERVIDOR',
+        CONCAT('MML-', APLIC.CODAPL) AS 'COD EQUIPAMENTO ENGEMAN',
+         CONCAT_WS('-', Aplic.CodApl,APLIC.TAG)'EQUIPAMENTO ENGEMAN',
+        Aplic.CodApl AS COD_EQUIPAMENTO,
+        CAST(ColAcu.DatHor AS DATE) AS DATA,
+        Aplic.CodEmp 'COD EMPRESA',
+       
+        SUM(IIF(PonConAcu.CodTipPon = 3, ColAcu.Valor, 0)) AS KILOMETRAGEM_RAW,
+        SUM(IIF(PonConAcu.CodTipPon = 1, ColAcu.Valor, 0)) AS HORIMETRO_RAW
+    FROM [SQLMML].[ENGEMAN].[engeman].[Aplic] WITH (NOLOCK)
+    LEFT JOIN [SQLMML].[ENGEMAN].[engeman].[CenCus] WITH (NOLOCK) ON Aplic.CodCen = CenCus.CodCen
+    LEFT JOIN [SQLMML].[ENGEMAN].[engeman].[ColAcu] WITH (NOLOCK) ON Aplic.CodApl = ColAcu.CodApl
+    JOIN [SQLMML].[ENGEMAN].[engeman].[PonConAcu] WITH (NOLOCK) ON Aplic.CodApl = PonConAcu.CodApl 
+    AND PonConAcu.CodPonAcu = ColAcu.CodPonAcu
+
+
+
+   WHERE ColAcu.DatHor >= '20250101' 
+
+    GROUP BY Aplic.CodApl, CAST(ColAcu.DatHor AS DATE), Aplic.CodEmp,  Aplic.TAG
+),
+ComValoresPreenchidos AS (
+    SELECT 
+        B.*,
+        COALESCE(NULLIF(B.KILOMETRAGEM_RAW, 0), LKP_KM.KILOMETRAGEM_RAW) AS KILOMETRAGEM,
+        COALESCE(NULLIF(B.HORIMETRO_RAW, 0), LKP_HM.HORIMETRO_RAW) AS HORIMETRO
+    FROM BaseValores B
+    OUTER APPLY (
+        SELECT TOP 1 KILOMETRAGEM_RAW 
+        FROM BaseValores 
+        WHERE COD_EQUIPAMENTO = B.COD_EQUIPAMENTO 
+        AND DATA < B.DATA 
+        AND KILOMETRAGEM_RAW > 0 
+        ORDER BY DATA DESC
+    ) LKP_KM
+    OUTER APPLY (
+        SELECT TOP 1 HORIMETRO_RAW 
+        FROM BaseValores 
+        WHERE COD_EQUIPAMENTO = B.COD_EQUIPAMENTO 
+        AND DATA < B.DATA 
+        AND HORIMETRO_RAW > 0 
+        ORDER BY DATA DESC
+    ) LKP_HM
+)
+
+    SELECT ComValoresPreenchidos.*,
+        KILOMETRAGEM - LAG(KILOMETRAGEM) OVER (PARTITION BY COD_EQUIPAMENTO ORDER BY DATA) AS VAR_KILOMETRAGEM,
+        HORIMETRO - LAG(HORIMETRO) OVER (PARTITION BY COD_EQUIPAMENTO ORDER BY DATA) AS VAR_HORIMETRO
+    FROM ComValoresPreenchidos
+GO

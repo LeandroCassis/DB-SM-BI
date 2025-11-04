@@ -1,0 +1,12 @@
+﻿CREATE TABLE [dbo].[METAS_RAJAMINE] (
+  [ID] [int] IDENTITY (10000, 1),
+  [ID INDICADOR] [int] NULL,
+  [INDICADOR] [varchar](50) NULL,
+  [INÍCIO DO MÊS] [date] NULL,
+  [EMPRESA] [varchar](50) NULL,
+  [ID EQUIPAMENTO RJM] [int] NULL,
+  [META ÍNDICE] [float] NULL,
+  PRIMARY KEY CLUSTERED ([ID]) WITH (FILLFACTOR = 80)
+)
+ON [PRIMARY]
+GO
