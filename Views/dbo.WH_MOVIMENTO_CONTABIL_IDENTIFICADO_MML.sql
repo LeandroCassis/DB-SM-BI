@@ -1,10 +1,7 @@
 ﻿SET QUOTED_IDENTIFIER, ANSI_NULLS ON
 GO
-
-CREATE VIEW [dbo].[WH_MOVIMENTO_CONTABIL_IDENTIFICADO_MML]
-AS
---CREATE VIEW dbo.WH_MOVIMENTO_CONTABIL_IDENTIFICADO_MML 
---AS -- =====================================================
+CREATE VIEW [dbo].[WH_MOVIMENTO_CONTABIL_IDENTIFICADO_MML] 
+AS -- =====================================================
 -- SCRIPT: EXTRAÇÃO DE LANÇAMENTOS CONTÁBEIS COM RATEIOS
 -- DESCRIÇÃO: Consulta unificada de lançamentos a débito e crédito
 --            incluindo rateios, centros de custo e identificação de pessoas
@@ -14,13 +11,13 @@ AS
 
 -- =====================================================
 -- CTE: _PESSOAS
--- OBJETIVO: Identificar pessoas (fornecedores/clientes) associadas aos lançamentos
+-- OBJETIVO: Identificar pessoas (fornecedores e clientes) associadas aos lançamentos
 -- TABELAS ENVOLVIDAS: e640lct, e644lvc, e644lti, e644lma, e644lff, e644lnf, 
---                     e645cfc, e644lam, e644lic, e095for, e110for, e110cli
+--                     e645cfc, e644lam, e644lic, e644lim, e095for, e110for, e110cli
+-- MODIFICAÇÃO: Expandido para identificar tanto fornecedores quanto clientes
 -- =====================================================
 WITH _PESSOAS AS (
     SELECT 
-        -- TOP 500 -- Limitador opcional (comentado)
         l.codemp                                AS 'COD EMPRESA',
         l.numlct                                AS 'NUM LANÇAMENTO',
         MAX(UPPER(d.src_table))                 AS 'TABELA',
@@ -29,47 +26,61 @@ WITH _PESSOAS AS (
             f.nomfor,    -- Nome do fornecedor (e095for)
             f2.nomfor,   -- Nome do fornecedor (e110for)
             c.nomcli     -- Nome do cliente (e110cli)
-        )))                                     AS 'PESSOA'
-    FROM [SQLMML].[Sapiens_Prod].[dbo].[e640lct] l
+        )))                                     AS 'PESSOA',
+        MAX(CASE 
+            WHEN d.codfor IS NOT NULL THEN 'FORNECEDOR'
+            WHEN d.codcli IS NOT NULL THEN 'CLIENTE'
+            ELSE NULL 
+        END)                                    AS 'TIPO PESSOA'
+    FROM [SQLMML].[Sapiens_Prod].[dbo].e640lct l
     
     -- Consolidação de múltiplas tabelas relacionadas a fornecedores/clientes
-    LEFT JOIN (
+    INNER JOIN (
+        -- FORNECEDORES
         SELECT numlct, codfor, NULL AS codcli, 'e644lvc' AS src_table 
-        FROM [SQLMML].[Sapiens_Prod].[dbo].[e644lvc]  -- Lançamentos de vale combustível
-        UNION ALL 
-        SELECT numlct, codfor, NULL, 'e644lti' 
-        FROM [SQLMML].[Sapiens_Prod].[dbo].[e644lti]  -- Lançamentos de título
+        FROM [SQLMML].[Sapiens_Prod].[dbo].e644lvc  -- Lançamentos de vale combustível
+        WHERE codfor IS NOT NULL
+--        UNION ALL 
+--        SELECT numlct, codfor, NULL, 'e644lti' 
+--        FROM [SQLMML].[Sapiens_Prod].[dbo].e644lti  -- Lançamentos de título
+--        WHERE codfor IS NOT NULL
         UNION ALL 
         SELECT numlct, codfor, NULL, 'e644lma' 
-        FROM [SQLMML].[Sapiens_Prod].[dbo].[e644lma]  -- Lançamentos de material
+        FROM [SQLMML].[Sapiens_Prod].[dbo].e644lma  -- Lançamentos de material
+        WHERE codfor IS NOT NULL
         UNION ALL 
         SELECT numlct, codfor, NULL, 'e644lff' 
-        FROM [SQLMML].[Sapiens_Prod].[dbo].[e644lff]  -- Lançamentos de fatura fornecedor
+        FROM [SQLMML].[Sapiens_Prod].[dbo].e644lff  -- Lançamentos de fatura fornecedor
+        WHERE codfor IS NOT NULL
         UNION ALL 
         SELECT numlct, codfor, NULL, 'e644lnf' 
-        FROM [SQLMML].[Sapiens_Prod].[dbo].[e644lnf]  -- Lançamentos de nota fiscal
+        FROM [SQLMML].[Sapiens_Prod].[dbo].e644lnf  -- Lançamentos de nota fiscal fornecedor
+        WHERE codfor IS NOT NULL
         UNION ALL 
         SELECT numlct, codfor, NULL, 'e645cfc' 
-        FROM [SQLMML].[Sapiens_Prod].[dbo].[e645cfc]  -- Contas a pagar fornecedor
+        FROM [SQLMML].[Sapiens_Prod].[dbo].e645cfc  -- Contas a pagar fornecedor
+        WHERE codfor IS NOT NULL
         UNION ALL 
         SELECT numlct, codfor, NULL, 'e644lam' 
-        FROM [SQLMML].[Sapiens_Prod].[dbo].[e644lam]  -- Lançamentos de ativo
+        FROM [SQLMML].[Sapiens_Prod].[dbo].e644lam  -- Lançamentos de ativo
+        WHERE codfor IS NOT NULL
+        -- CLIENTES
         UNION ALL 
         SELECT numlct, NULL AS codfor, codcli, 'e644lic' 
-        FROM [SQLMML].[Sapiens_Prod].[dbo].[e644lic]  -- Lançamentos de cliente
+        FROM [SQLMML].[Sapiens_Prod].[dbo].e644lic  -- Lançamentos de imposto (cliente)
+        WHERE codcli IS NOT NULL
+        UNION ALL 
+        SELECT numlct, NULL AS codfor, codcli, 'e644lim' 
+        FROM [SQLMML].[Sapiens_Prod].[dbo].e644lim  -- Lançamentos de item material (cliente)
+        WHERE codcli IS NOT NULL
     ) d ON l.numlct = d.numlct
     
     -- Joins para obter nomes de fornecedores e clientes
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[e095for] f   ON d.codfor = f.codfor   -- Cadastro fornecedor 1
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[e110for] f2  ON d.codfor = f2.codfor  -- Cadastro fornecedor 2
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[e110cli] c   ON d.codcli = c.codcli   -- Cadastro cliente
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].e095for f   ON d.codfor = f.codfor   -- Cadastro fornecedor 1
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].e110for f2  ON d.codfor = f2.codfor  -- Cadastro fornecedor 2
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].e110cli c   ON d.codcli = c.codcli   -- Cadastro cliente
     
     WHERE l.datlct >= '2025-01-01'  -- Apenas lançamentos de 2025 em diante
-        AND (
-            d.codfor IS NOT NULL           -- Possui fornecedor
-            OR d.codcli IS NOT NULL        -- OU possui cliente
-            OR (l.cgccpf IS NOT NULL AND l.cgccpf <> 0)  -- OU possui CPF/CNPJ
-        )
     
     GROUP BY l.codemp, l.numlct
 )
@@ -129,66 +140,53 @@ SELECT
     END                                         AS 'N° REQUISICAO',
     
     -- Identificação da pessoa relacionada ao lançamento
-    COALESCE(
-        _PESSOAS.PESSOA,  -- Primeira prioridade: pessoa da CTE
-        IIF(LCT.ORILCT = 'REC',  -- Se origem = Recebimento
-            UPPER(NULLIF(
-                REPLACE(REPLACE(
-                    LTRIM(RTRIM(
-                        RIGHT(
-                            LCT.CPLLCT,
-                            NULLIF(CHARINDEX(',', REVERSE(LCT.CPLLCT)) - 1, -1)
-                        )
-                    )),
-                    '"', ''   -- Remove aspas duplas
-                ),
-                '''', ''      -- Remove aspas simples
-                ),
-                ''
-            )),
-            IIF(LCT.ORILCT = 'VEN',  -- Se origem = Venda
-                UPPER(NULLIF(
-                    REPLACE(REPLACE(
-                        LTRIM(RTRIM(
-                            RIGHT(
-                                LCT.CPLLCT,
-                                NULLIF(CHARINDEX(',', REVERSE(LCT.CPLLCT)) - 1, -1)
-                            )
-                        )),
-                        '"', ''
-                    ),
-                    '''', ''
-                    ),
-                    ''
+    CASE 
+        WHEN UPPER(ISNULL(HPD.DESHPD, '') + ' ' + ISNULL(LCT.CPLLCT, '')) IN (
+            'VALOR REF. FOLHA DE PAGAMENTO DESTE MES.',
+            'VALOR INSS PARTE EMPRESA.',
+            'VALOR PROVISÃO DE FÉRIAS DESTE MES.',
+            'VALOR REF. HORAS EXTRAS DESTE MES.',
+            'VALOR FGTS SOBRE FOLHA DESTE MES.',
+            'VALOR PROVISÃO 13° SALÁRIO DESTE MES.'
+        ) THEN NULL
+        ELSE COALESCE(
+            _PESSOAS.PESSOA,  -- Primeira prioridade: pessoa da CTE
+            -- Extrai nome após a última vírgula do complemento
+            UPPER(NULLIF(REPLACE(REPLACE(
+                LTRIM(RTRIM(
+                    CASE 
+                        WHEN CHARINDEX(',', REVERSE(LCT.CPLLCT)) > 0 THEN
+                            RIGHT(LCT.CPLLCT, CHARINDEX(',', REVERSE(LCT.CPLLCT)) - 1)
+                        ELSE LCT.CPLLCT
+                    END
                 )),
-                NULL
-            )
+            '"', ''), '''', ''), ''))
         )
-    )                                           AS 'PESSOA'
+    END                                         AS 'PESSOA'
 
-FROM [SQLMML].[Sapiens_Prod].[dbo].[E640LCT] LCT WITH (NOLOCK)  -- Tabela principal de lançamentos
+FROM [SQLMML].[Sapiens_Prod].[dbo].E640LCT LCT WITH (NOLOCK)  -- Tabela principal de lançamentos
 
     -- JOIN: Informações da empresa
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E070EMP] EMP WITH (NOLOCK)
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E070EMP EMP WITH (NOLOCK)
         ON LCT.CODEMP = EMP.CODEMP
     
     -- JOIN: Histórico padrão de lançamentos
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E046HPD] HPD WITH (NOLOCK)
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E046HPD HPD WITH (NOLOCK)
         ON LCT.CODHPD = HPD.CODHPD
     
     -- JOIN: Rateios para contas de débito
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E640RAT] RAT WITH (NOLOCK)
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E640RAT RAT WITH (NOLOCK)
         ON LCT.CODEMP = RAT.CODEMP 
         AND LCT.NUMLCT = RAT.NUMLCT
         AND RAT.DEBCRE = 'D'  -- Apenas rateios de débito
     
     -- JOIN: Centro de custo
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E044CCU] CCU WITH (NOLOCK)
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E044CCU CCU WITH (NOLOCK)
         ON RAT.CODEMP = CCU.CODEMP 
         AND RAT.CODCCU = CCU.CODCCU
     
     -- JOIN: Plano de contas contábeis
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E045PLA] PLA WITH (NOLOCK)   
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E045PLA PLA WITH (NOLOCK)   
         ON LCT.CODEMP = PLA.CODEMP
         AND LCT.CTADEB = PLA.CTARED
     
@@ -247,7 +245,7 @@ SELECT
             ELSE 'OUTROS' 
         END, 
         'NÃO LISTADO'
-    )                                           AS 'CLASSIFICACAO',
+    )                                            AS 'CLASSIFICACAO',
     
     LCT.SITLCT                                  AS 'SITUAÇÃO',
     LCT.NUMLCT                                  AS 'SEQ. LANCAMENTO',
@@ -258,63 +256,50 @@ SELECT
     END                                         AS 'N° REQUISICAO',
     
     -- Identificação da pessoa (lógica idêntica)
-    COALESCE(
-        _PESSOAS.PESSOA,
-        IIF(LCT.ORILCT = 'REC',
-            UPPER(NULLIF(
-                REPLACE(REPLACE(
-                    LTRIM(RTRIM(
-                        RIGHT(
-                            LCT.CPLLCT,
-                            NULLIF(CHARINDEX(',', REVERSE(LCT.CPLLCT)) - 1, -1)
-                        )
-                    )),
-                    '"', ''
-                ),
-                '''', ''
-                ),
-                ''
-            )),
-            IIF(LCT.ORILCT = 'VEN',
-                UPPER(NULLIF(
-                    REPLACE(REPLACE(
-                        LTRIM(RTRIM(
-                            RIGHT(
-                                LCT.CPLLCT,
-                                NULLIF(CHARINDEX(',', REVERSE(LCT.CPLLCT)) - 1, -1)
-                            )
-                        )),
-                        '"', ''
-                    ),
-                    '''', ''
-                    ),
-                    ''
+    CASE 
+        WHEN TRIM(UPPER(ISNULL(HPD.DESHPD, '') + ' ' + ISNULL(LCT.CPLLCT, ''))) IN (
+            'VALOR REF. FOLHA DE PAGAMENTO DESTE MES.',
+            'VALOR INSS PARTE EMPRESA.',
+            'VALOR PROVISÃO DE FÉRIAS DESTE MES.',
+            'VALOR REF. HORAS EXTRAS DESTE MES.',
+            'VALOR FGTS SOBRE FOLHA DESTE MES.',
+            'VALOR PROVISÃO 13° SALÁRIO DESTE MES.'
+        ) THEN NULL
+        ELSE COALESCE(
+            _PESSOAS.PESSOA,
+            -- Extrai nome após a última vírgula do complemento
+            UPPER(NULLIF(REPLACE(REPLACE(
+                LTRIM(RTRIM(
+                    CASE 
+                        WHEN CHARINDEX(',', REVERSE(LCT.CPLLCT)) > 0 THEN
+                            RIGHT(LCT.CPLLCT, CHARINDEX(',', REVERSE(LCT.CPLLCT)) - 1)
+                        ELSE LCT.CPLLCT
+                    END
                 )),
-                NULL
-            )
+            '"', ''), '''', ''), ''))
         )
-    )                                           AS 'PESSOA'
+    END                                         AS 'PESSOA'
 
-FROM [SQLMML].[Sapiens_Prod].[dbo].[E640LCT] LCT WITH (NOLOCK)
+FROM [SQLMML].[Sapiens_Prod].[dbo].E640LCT LCT WITH (NOLOCK)
 
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E070EMP] EMP WITH (NOLOCK)
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E070EMP EMP WITH (NOLOCK)
         ON LCT.CODEMP = EMP.CODEMP
     
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E046HPD] HPD WITH (NOLOCK)
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E046HPD HPD WITH (NOLOCK)
         ON LCT.CODHPD = HPD.CODHPD
     
     -- JOIN: Rateios para contas de crédito
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E640RAT] RAT WITH (NOLOCK)
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E640RAT RAT WITH (NOLOCK)
         ON LCT.CODEMP = RAT.CODEMP 
         AND LCT.NUMLCT = RAT.NUMLCT
         AND RAT.DEBCRE = 'C'  -- Diferença: Apenas rateios de crédito
     
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E044CCU] CCU WITH (NOLOCK)
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E044CCU CCU WITH (NOLOCK)
         ON RAT.CODEMP = CCU.CODEMP 
         AND RAT.CODCCU = CCU.CODCCU
     
     -- JOIN: Plano de contas com CTACRE
-    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].[E045PLA] PLA WITH (NOLOCK)   
+    LEFT JOIN [SQLMML].[Sapiens_Prod].[dbo].E045PLA PLA WITH (NOLOCK)   
         ON LCT.CODEMP = PLA.CODEMP
         AND LCT.CTACRE = PLA.CTARED  -- Diferença: CTACRE em vez de CTADEB
     
