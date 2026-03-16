@@ -1,7 +1,8 @@
 ﻿SET QUOTED_IDENTIFIER, ANSI_NULLS ON
 GO
-CREATE VIEW [dbo].[WH_SOLICITAÇÕES] 
-AS -- =====================================================================
+CREATE VIEW [dbo].[WH_SOLICITAÇÕES] AS
+
+-- =====================================================================
 -- CONSULTA: RELATÓRIO COMPLETO DE SOLICITAÇÕES DE COMPRAS
 -- =====================================================================
 -- TABELAS UTILIZADAS:
@@ -22,6 +23,7 @@ SELECT
     
     -- DADOS DA EMPRESA E SOLICITAÇÃO
     E405SOL.CODEMP 'COD EMPRESA',                                   -- Código da empresa
+    E405SOL.FILSOL 'COD FILIAL',
     CONCAT_WS('-','MIB',E405SOL.CODEMP) 'KEY EMPRESA',               -- Chave única da empresa
     E405SOL.NUMSOL 'COD SOLICITAÇÃO',                              -- Número da solicitação
     CONCAT_WS('-','MIB',E405SOL.CODEMP,E405SOL.NUMSOL) 'KEY SOLICITAÇÃO', -- Chave única da solicitação
@@ -138,7 +140,8 @@ SELECT
 
     -- OBSERVAÇÕES
     UPPER(SUBSTRING(E405SOL.OBSSOL, 1, 80)) 'OBSERVAÇÃO SOLICITAÇÃO',  -- Observação limitada a 80 caracteres
-    E405SOL.CODPRI 'COD PRIORIDADE'                          -- Código prioridade
+    E405SOL.CODPRI 'COD PRIORIDADE',                          -- Código prioridade
+    IIF(E405SOL.CODPRI=1,'NORMAL',IIF(E405SOL.CODPRI=2,'URGENTE','VERIFICAR')) 'PRIORIDADE' --prioridade
 -- =====================================================================
 -- RELACIONAMENTOS E JOINS
 -- =====================================================================
@@ -209,6 +212,7 @@ SELECT
     
     -- DADOS DA EMPRESA E SOLICITAÇÃO
     E405SOL.CODEMP 'COD EMPRESA',                                   -- Código da empresa
+    E405SOL.FILSOL 'COD FILIAL',
     CONCAT_WS('-','MML',E405SOL.CODEMP) 'KEY EMPRESA',               -- Chave única da empresa
     E405SOL.NUMSOL 'COD SOLICITAÇÃO',                              -- Número da solicitação
     CONCAT_WS('-','MML',E405SOL.CODEMP,E405SOL.NUMSOL) 'KEY SOLICITAÇÃO', -- Chave única da solicitação
@@ -308,7 +312,8 @@ SELECT
 
     -- OBSERVAÇÕES
     UPPER(SUBSTRING(E405SOL.OBSSOL, 1, 80)) 'OBSERVAÇÃO SOLICITAÇÃO',  -- Observação limitada a 80 caracteres
-    E405SOL.CODPRI 'COD PRIORIDADE'                          -- Código prioridade
+    E405SOL.CODPRI 'COD PRIORIDADE',                          -- Código prioridade
+    IIF(E405SOL.CODPRI=1,'NORMAL',IIF(E405SOL.CODPRI=2,'URGENTE','VERIFICAR')) 'PRIORIDADE' --prioridade
 -- =====================================================================
 -- RELACIONAMENTOS E JOINS
 -- =====================================================================
