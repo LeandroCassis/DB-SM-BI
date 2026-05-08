@@ -1,8 +1,8 @@
 ﻿SET QUOTED_IDENTIFIER, ANSI_NULLS ON
 GO
+CREATE VIEW [dbo].[WH_PREVISÃO_TEMPO_EQUIPAMENTOS] AS
 
-CREATE   VIEW [dbo].[WH_PREVISÃO_TEMPO_EQUIPAMENTOS] 
-AS
+
 WITH Parametros AS
 (
     SELECT
@@ -13,8 +13,10 @@ WITH Parametros AS
 Equipamentos AS
 (
     SELECT
+
         'MIB' AS Servidor,
         A.TAG AS [TAG EQUIPAMENTO],
+        CONCAT_WS('-',E.CODEMP,A.CODAPL,A.DESCRICAO) 'KEY EQUIPAMENTO',
         A.CODAPL,
         E.CODEMP AS [COD EMPRESA],
         E.RAZSOC AS Empresa,
@@ -31,6 +33,7 @@ Equipamentos AS
     SELECT
         'MML' AS Servidor,
         A.TAG AS [TAG EQUIPAMENTO],
+        CONCAT_WS('-',E.CODEMP,A.CODAPL,A.DESCRICAO) 'KEY EQUIPAMENTO',
         A.CODAPL,
         E.CODEMP AS [COD EMPRESA],
         E.RAZSOC AS Empresa,
@@ -72,6 +75,7 @@ SELECT
     D.Dia AS [DATA],
     'TOTAL DO DIA' AS [TURNO],
     EQ.[TAG EQUIPAMENTO] AS [TAG EQUIPAMENTO],
+    EQ.[KEY EQUIPAMENTO],
     EQ.Equipamento AS [EQUIPAMENTO],
     CAST(Calc.HorasPrevistas AS DECIMAL(18,4)) AS [#HORAS PREVISTAS],
     [Engeman].[Engeman].[fntoh](Calc.HorasPrevistas) AS [#TEMPO PREVISTO]
@@ -95,5 +99,5 @@ CROSS APPLY
         DATEDIFF(SECOND, Limites.InicioDia, Limites.FimDia) AS SegundosPrevistos,
         DATEDIFF(SECOND, Limites.InicioDia, Limites.FimDia) / 3600.0 AS HorasPrevistas
 ) Calc
-WHERE Calc.SegundosPrevistos > 0;
+WHERE Calc.SegundosPrevistos > 0
 GO
